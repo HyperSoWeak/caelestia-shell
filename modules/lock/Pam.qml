@@ -25,6 +25,8 @@ Scope {
     readonly property alias howdy: howdy
 
     property string lockMessage
+    // fprintd errors out when the system suspends mid-verify; ignore that and restart on resume.
+    property bool sleeping
     property int state
     property string buffer
 
@@ -143,7 +145,14 @@ Scope {
     }
 
     Connections {
+        function onAboutToSleep(): void {
+            root.sleeping = true;
+        }
+
         function onResumed(): void {
+            root.sleeping = false;
+            if (root.lock.secure && !fprint.active)
+                root.restartFprint();
             if (howdy.canAttempt && !howdy.active && GlobalConfig.lock.triggerHowdyOnWake)
                 howdy.start();
         }
@@ -230,7 +239,7 @@ Scope {
             configDirectory: Quickshell.shellPath("assets/pam.d")
 
             onCompleted: res => {
-                if (!ctx.available)
+                if (!ctx.available || root.sleeping)
                     return;
 
                 if (res === PamResult.Success)
