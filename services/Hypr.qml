@@ -93,6 +93,22 @@ Singleton {
         return Hyprland.monitorFor(screen);
     }
 
+    // The window to show for a given screen: the focused window on the focused monitor,
+    // otherwise the last focused window on that monitor's visible workspace
+    function activeToplevelFor(screen: ShellScreen): HyprlandToplevel {
+        const mon = monitorFor(screen);
+        if (!mon || mon === focusedMonitor)
+            return activeToplevel;
+
+        const special = mon.lastIpcObject.specialWorkspace?.name;
+        const ws = special ? workspaces.values.find(w => w.name === special) : mon.activeWorkspace;
+        const addr = ws?.lastIpcObject.lastwindow;
+        if (!addr || addr === "0x0")
+            return null;
+
+        return ws.toplevels.values.find(t => `0x${t.address}` === addr) ?? null;
+    }
+
     function trimWsName(name: string): string {
         return name.startsWith("special:") ? name.slice("special:".length) : name;
     }
@@ -132,6 +148,10 @@ Singleton {
             } else if (["workspace", "moveworkspace", "activespecial", "focusedmon"].includes(n)) {
                 Hyprland.refreshWorkspaces();
                 Hyprland.refreshMonitors();
+            } else if (n === "activewindow") {
+                // Keeps each workspace's lastwindow current for activeToplevelFor()
+                Hyprland.refreshToplevels();
+                Hyprland.refreshWorkspaces();
             } else if (["openwindow", "closewindow", "movewindow"].includes(n)) {
                 Hyprland.refreshToplevels();
                 Hyprland.refreshWorkspaces();

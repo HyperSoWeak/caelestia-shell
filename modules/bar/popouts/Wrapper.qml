@@ -87,6 +87,8 @@ Item {
     PopoutState {
         id: popoutState
 
+        screen: root.screen
+
         onDetachRequested: mode => root.detach(mode)
     }
 
@@ -123,7 +125,7 @@ Item {
 
         sourceComponent: WindowInfo {
             screen: root.screen
-            client: Hypr.activeToplevel
+            client: Hypr.activeToplevelFor(root.screen)
         }
     }
 
