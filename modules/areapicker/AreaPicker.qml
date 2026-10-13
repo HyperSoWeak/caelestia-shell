@@ -14,6 +14,8 @@ Scope {
         property bool freeze
         property bool closing
         property bool clipboardOnly
+        property bool menuMode: false
+        property string captureMode: "menu"
 
         Variants {
             model: Screens.screens
@@ -49,6 +51,7 @@ Scope {
 
     IpcHandler {
         function open(): void {
+            root.menuMode = false;
             root.freeze = false;
             root.closing = false;
             root.clipboardOnly = false;
@@ -56,6 +59,7 @@ Scope {
         }
 
         function openFreeze(): void {
+            root.menuMode = false;
             root.freeze = true;
             root.closing = false;
             root.clipboardOnly = false;
@@ -63,6 +67,7 @@ Scope {
         }
 
         function openClip(): void {
+            root.menuMode = false;
             root.freeze = false;
             root.closing = false;
             root.clipboardOnly = true;
@@ -70,10 +75,25 @@ Scope {
         }
 
         function openFreezeClip(): void {
+            root.menuMode = false;
             root.freeze = true;
             root.closing = false;
             root.clipboardOnly = true;
             root.activeAsync = true;
+        }
+
+        function openFreezeMenu(): void {
+            root.menuMode = true;
+            root.captureMode = "menu";
+            root.freeze = true;
+            root.closing = false;
+            root.clipboardOnly = false;
+            root.activeAsync = true;
+        }
+
+        function closeMenu(): void {
+            if (root.menuMode)
+                root.activeAsync = false;
         }
 
         target: "picker"
@@ -85,6 +105,7 @@ Scope {
         name: "screenshot"
         description: "Open screenshot tool"
         onPressed: {
+            root.menuMode = false;
             root.freeze = false;
             root.closing = false;
             root.clipboardOnly = false;
@@ -98,6 +119,7 @@ Scope {
         name: "screenshotFreeze"
         description: "Open screenshot tool (freeze mode)"
         onPressed: {
+            root.menuMode = false;
             root.freeze = true;
             root.closing = false;
             root.clipboardOnly = false;
@@ -111,6 +133,7 @@ Scope {
         name: "screenshotClip"
         description: "Open screenshot tool (clipboard)"
         onPressed: {
+            root.menuMode = false;
             root.freeze = false;
             root.closing = false;
             root.clipboardOnly = true;
@@ -124,6 +147,7 @@ Scope {
         name: "screenshotFreezeClip"
         description: "Open screenshot tool (freeze mode, clipboard)"
         onPressed: {
+            root.menuMode = false;
             root.freeze = true;
             root.closing = false;
             root.clipboardOnly = true;

@@ -1,12 +1,15 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Layouts
+import Caelestia.Config
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Caelestia
 import Caelestia.I18n
 import qs.components
+import qs.components.controls
 import qs.components.effects
 import qs.services
 
@@ -17,6 +20,34 @@ MouseArea {
     required property ShellScreen screen
 
     property bool onClient
+    readonly property string captureMode: loader.menuMode ? loader.captureMode : "auto"
+    readonly property bool snapshotReady: screencopy.item ? screencopy.item.hasContent : false
+    property int menuIndex: 0
+
+    function chooseMode(index: int): void {
+        if (!snapshotReady)
+            return;
+        if (index === 0) {
+            loader.captureMode = "fullscreen";
+            onClient = false;
+            sx = sy = 0;
+            ex = screen.width;
+            ey = screen.height;
+            save();
+        } else {
+            loader.captureMode = index === 1 ? "window" : "region";
+        }
+    }
+
+    onCaptureModeChanged: {
+        if (captureMode === "region") {
+            onClient = false;
+            sx = sy = ex = ey = 0;
+        } else if (captureMode === "window") {
+            onClient = false;
+            checkClientRects(mouseX, mouseY);
+        }
+    }
 
     property real realBorderWidth: onClient ? (Hypr.options["general:border_size"] ?? 1) : 2
     property real realRounding: onClient ? (Hypr.options["decoration:rounding"] ?? 0) : 0
@@ -55,6 +86,12 @@ MouseArea {
     }
 
     function checkClientRects(x: real, y: real): void {
+        if (captureMode === "menu" || captureMode === "region" || captureMode === "fullscreen")
+            return;
+        if (captureMode === "window") {
+            onClient = false;
+            sx = sy = ex = ey = 0;
+        }
         for (const client of clients) {
             if (!client)
                 continue;
@@ -127,12 +164,14 @@ MouseArea {
     }
 
     onPressed: event => {
+        if (captureMode === "menu" || captureMode === "window")
+            return;
         ssx = event.x;
         ssy = event.y;
     }
 
     onReleased: {
-        if (closeAnim.running)
+        if (closeAnim.running || captureMode === "menu" || (captureMode === "window" && !onClient) || sw < 1 || sh < 1)
             return;
 
         if (root.loader.freeze) {
@@ -148,6 +187,12 @@ MouseArea {
         const x = event.x;
         const y = event.y;
 
+        if (captureMode === "menu")
+            return;
+        if (captureMode === "window") {
+            checkClientRects(x, y);
+            return;
+        }
         if (pressed) {
             onClient = false;
             sx = ssx;
@@ -161,6 +206,22 @@ MouseArea {
 
     focus: true
     Keys.onEscapePressed: closeAnim.start()
+    Keys.onPressed: event => {
+        if (captureMode !== "menu")
+            return;
+        if (event.key === Qt.Key_Down) {
+            menuIndex = (menuIndex + 1) % 3;
+        } else if (event.key === Qt.Key_Up) {
+            menuIndex = (menuIndex + 2) % 3;
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            chooseMode(menuIndex);
+        } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_3) {
+            chooseMode(event.key - Qt.Key_1);
+        } else {
+            return;
+        }
+        event.accepted = true;
+    }
 
     SequentialAnimation {
         id: closeAnim
@@ -235,10 +296,11 @@ MouseArea {
         id: overlay
 
         anchors.fill: parent
-        color: Colours.palette.m3secondaryContainer
-        opacity: 0.3
+        color: root.captureMode === "menu" ? Colours.palette.m3scrim : Colours.palette.m3secondaryContainer
+        opacity: root.captureMode === "menu" ? 0.32 : 0.3
 
-        layer.enabled: true
+        // The chooser dims the whole screen; selection modes reveal the crop.
+        layer.enabled: root.captureMode !== "menu"
         layer.effect: Mask {
             maskSource: selectionWrapper
             maskInverted: true
@@ -266,6 +328,7 @@ MouseArea {
     Rectangle {
         id: border
 
+        visible: root.captureMode !== "menu" && root.sw > 0 && root.sh > 0
         color: "transparent"
         radius: root.realRounding > 0 ? root.realRounding + root.realBorderWidth : 0
         border.width: root.realBorderWidth
@@ -281,6 +344,74 @@ MouseArea {
         }
     }
 
+    Elevation {
+        id: captureMenu
+
+        anchors.centerIn: parent
+        implicitWidth: Math.max(260, menuContent.implicitWidth + Tokens.padding.medium * 2)
+        implicitHeight: menuContent.implicitHeight + Tokens.padding.medium * 2
+        radius: Tokens.rounding.large
+        level: 2
+        visible: root.captureMode === "menu" && root.snapshotReady
+
+        StyledRect {
+            anchors.fill: parent
+            radius: parent.radius
+            color: Colours.palette.m3surfaceContainerLow
+
+            ColumnLayout {
+                id: menuContent
+
+                anchors.fill: parent
+                anchors.margins: Tokens.padding.medium
+                spacing: Tokens.spacing.small
+
+                StyledText {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.bottomMargin: Tokens.spacing.small
+                    text: "Screenshot"
+                    font: Tokens.font.title.small
+                }
+
+                Repeater {
+                    model: [
+                        { label: "Full screen", icon: "desktop_windows" },
+                        { label: "Window", icon: "select_window" },
+                        { label: "Region", icon: "crop_free" }
+                    ]
+
+                    delegate: IconTextButton {
+                        id: option
+
+                        required property int index
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        text: modelData.label
+                        icon: modelData.icon
+                        type: IconTextButton.Filled
+                        isToggle: true
+                        checked: root.menuIndex === index
+                        // Keep matching foreground/background pairs in both states.
+                        activeColour: Colours.palette.m3primary
+                        activeOnColour: Colours.palette.m3onPrimary
+                        inactiveColour: Colours.palette.m3surfaceContainerHigh
+                        inactiveOnColour: Colours.palette.m3onSurface
+                        verticalPadding: Tokens.padding.medium
+                        onClicked: root.chooseMode(index)
+
+                        Connections {
+                            target: option.stateLayer
+                            function onEntered(): void {
+                                root.menuIndex = option.index;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Behavior on opacity {
         Anim {
             type: Anim.StandardLarge
@@ -288,25 +419,25 @@ MouseArea {
     }
 
     Behavior on rsx {
-        enabled: !root.pressed
+        enabled: !root.pressed && !root.loader.menuMode
 
         Anim {}
     }
 
     Behavior on rsy {
-        enabled: !root.pressed
+        enabled: !root.pressed && !root.loader.menuMode
 
         Anim {}
     }
 
     Behavior on sw {
-        enabled: !root.pressed
+        enabled: !root.pressed && !root.loader.menuMode
 
         Anim {}
     }
 
     Behavior on sh {
-        enabled: !root.pressed
+        enabled: !root.pressed && !root.loader.menuMode
 
         Anim {}
     }
