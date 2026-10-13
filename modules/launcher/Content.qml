@@ -107,12 +107,24 @@ Item {
             }
         }
 
-        Component.onCompleted: forceActiveFocus()
+        function applyPendingText(): void {
+            if (root.screenState.launcherText) {
+                text = root.screenState.launcherText;
+                root.screenState.launcherText = "";
+            }
+        }
+
+        Component.onCompleted: {
+            applyPendingText();
+            forceActiveFocus();
+        }
 
         Connections {
             function onLauncherChanged(): void {
                 if (!root.screenState.launcher)
                     search.text = "";
+                else
+                    search.applyPendingText();
             }
 
             function onSessionChanged(): void {

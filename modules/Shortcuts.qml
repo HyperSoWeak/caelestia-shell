@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Caelestia
+import Caelestia.Config
 import qs.components.misc
 import qs.services
 import qs.modules.nexus
@@ -133,6 +134,22 @@ Scope {
         }
 
         target: "drawers"
+    }
+
+    IpcHandler {
+        function windows(): void {
+            if (root.hasFullscreen)
+                return;
+            const screenState = ShellState.forActive();
+            if (screenState.launcher) {
+                screenState.launcher = false;
+                return;
+            }
+            screenState.launcherText = `${GlobalConfig.launcher.actionPrefix}window `;
+            screenState.launcher = true;
+        }
+
+        target: "launcher"
     }
 
     IpcHandler {
