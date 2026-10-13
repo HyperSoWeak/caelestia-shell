@@ -24,6 +24,7 @@ qml_module(caelestia-services
         Qt::Concurrent
         Qt::DBus
         Qt::Network
+        PkgConfig::OpenCC
         PkgConfig::Pipewire
         PkgConfig::Aubio
         PkgConfig::Cava

@@ -234,11 +234,19 @@ Item {
                 model; // Force update when lyrics change
                 return Lyrics.indexForTime(Players.active?.position ?? 0);
             });
-            positionViewAtIndex(currentIndex, ListView.Center);
+            if (Lyrics.synced)
+                positionViewAtIndex(currentIndex, ListView.Center);
+            else
+                positionViewAtBeginning();
         }
-        onModelChanged: Qt.callLater(() => positionViewAtIndex(currentIndex, ListView.Center))
+        onModelChanged: Qt.callLater(() => {
+            if (Lyrics.synced)
+                positionViewAtIndex(currentIndex, ListView.Center);
+            else
+                positionViewAtBeginning();
+        })
 
-        highlightRangeMode: ListView.ApplyRange
+        highlightRangeMode: Lyrics.synced ? ListView.ApplyRange : ListView.NoHighlightRange
         highlightMoveDuration: Tokens.anim.durations.large
         highlightMoveVelocity: -1
         preferredHighlightBegin: (height - (currentItem?.implicitHeight ?? 0)) / 2
@@ -258,8 +266,8 @@ Item {
             anchors.left: lyrics.contentItem.left
             anchors.right: lyrics.contentItem.right
 
-            text: modelData || ". . ."
-            color: ListView.isCurrentItem ? Colours.palette.m3primary : mouse.containsMouse ? Colours.palette.m3onSurface : Colours.palette.m3outline
+            text: modelData || (Lyrics.synced ? ". . ." : "")
+            color: !Lyrics.synced ? Colours.palette.m3onSurface : ListView.isCurrentItem ? Colours.palette.m3primary : mouse.containsMouse ? Colours.palette.m3onSurface : Colours.palette.m3outline
             font: Tokens.font.body.medium
             wrapMode: Text.WrapAtWordBoundaryOrAnywhere
 
@@ -282,11 +290,12 @@ Item {
                 id: mouse
 
                 anchors.fill: parent
+                enabled: Lyrics.synced
                 cursorShape: Qt.PointingHandCursor
                 hoverEnabled: true
                 onClicked: {
                     const p = Players.active;
-                    if (p)
+                    if (p && Lyrics.synced)
                         p.position = Lyrics.timeForIndex(lyric.index);
                 }
             }

@@ -167,7 +167,7 @@ Item {
 
                 StyledText {
                     // TRANSLATORS: %1 = lyric timing offset; ms is the millisecond unit, leave untranslated
-                    text: Tr.tr("Offset: %1 ms").arg(Lyrics.offset)
+                    text: Lyrics.synced ? Tr.tr("Offset: %1 ms").arg(Lyrics.offset) : "純文字歌詞（無同步時間）"
                     color: Colours.palette.m3onSurfaceVariant
                     animate: true
                 }

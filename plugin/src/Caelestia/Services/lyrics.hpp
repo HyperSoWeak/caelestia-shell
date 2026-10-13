@@ -30,6 +30,7 @@ class Lyrics : public QObject {
             NOTIFY selectedCandidateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(bool hasLyrics READ hasLyrics NOTIFY hasLyricsChanged)
+    Q_PROPERTY(bool synced READ synced NOTIFY lyricsChanged)
     Q_PROPERTY(qreal offset READ offset WRITE setOffset NOTIFY offsetChanged)
     Q_PROPERTY(QString trackArtist READ trackArtist NOTIFY trackChanged)
     Q_PROPERTY(QString trackTitle READ trackTitle NOTIFY trackChanged)
@@ -46,6 +47,7 @@ public:
     void setSelectedCandidate(const LyricCandidate& value);
     [[nodiscard]] bool loading() const;
     [[nodiscard]] bool hasLyrics() const;
+    [[nodiscard]] bool synced() const;
     [[nodiscard]] qreal offset() const;
     void setOffset(qreal value);
     [[nodiscard]] QString trackArtist() const;
@@ -72,7 +74,10 @@ signals:
 private:
     void setBackend(LyricsBackend value);
     void setLoading(bool value);
-    void setLines(QVector<LyricLine> lines, LyricsBackend source);
+    void setLines(QVector<LyricLine> lines, LyricsBackend source, bool synced = true);
+    void setPlainLyrics(const QString& text, LyricsBackend source);
+    void rememberPlainLyrics(const QJsonObject& candidate);
+    void finishWithoutSynced();
     void clearLines();
     void appendCandidates(const QList<LyricCandidate>& add);
     void clearCandidates();
@@ -84,6 +89,7 @@ private:
 
     void tryLocal(int reqId);
     void tryLrclib(int reqId);
+    void tryLrclibSearch(int reqId, bool simplified = false);
     void tryNetEase(int reqId);
     void chainNext(LyricsBackend justFailed, int reqId);
 
@@ -129,6 +135,10 @@ private:
     LyricCandidate m_selected;
     bool m_loading = false;
     bool m_hasLyrics = false;
+    bool m_synced = false;
+    QString m_plainText;
+    LyricCandidate m_plainCandidate;
+    qreal m_plainScore = 0.0;
     qreal m_offset = 0.0;
 
     QString m_artist;
