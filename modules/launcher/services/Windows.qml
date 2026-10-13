@@ -35,11 +35,11 @@ Searcher {
 
     component Window: QtObject {
         required property HyprlandToplevel modelData
-        readonly property string title: modelData.title
-        readonly property string appClass: modelData.lastIpcObject.class ?? ""
-        readonly property string workspace: Hypr.trimWsName(modelData.workspace?.name ?? "")
+        readonly property string title: modelData?.title ?? ""
+        readonly property string appClass: modelData?.lastIpcObject.class ?? ""
+        readonly property string workspace: Hypr.trimWsName(modelData?.workspace?.name ?? "")
         readonly property int order: {
-            const id = modelData.lastIpcObject.focusHistoryID ?? 999;
+            const id = modelData?.lastIpcObject.focusHistoryID ?? 999;
             return id === 0 ? 1000 : id;
         }
 
