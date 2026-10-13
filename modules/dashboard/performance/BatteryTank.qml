@@ -94,7 +94,7 @@ StyledClippingRect {
                 if (contents.charging)
                     return Tr.trCtx("Charging", "battery state");
 
-                const s = UPower.displayDevice.timeToEmpty;
+                const s = BatteryEstimate.timeToEmpty;
                 if (s === 0)
                     return "...";
 

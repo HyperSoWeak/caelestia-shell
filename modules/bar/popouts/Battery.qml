@@ -64,7 +64,7 @@ Column {
                 return Tr.tr("Power profile: %1").arg(root.powerProfileToString(PowerProfiles.profile));
 
             if (UPower.onBattery) {
-                const time = root.formatSeconds(dev.timeToEmpty);
+                const time = root.formatSeconds(BatteryEstimate.timeToEmpty);
                 if (time)
                     return Tr.tr("Time remaining: %1").arg(time);
                 return Tr.tr("Calculating remaining battery life...");
