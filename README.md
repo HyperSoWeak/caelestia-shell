@@ -10,6 +10,40 @@
 
 </div>
 
+> [!IMPORTANT]
+> This is a personal fork of [caelestia-dots/shell](https://github.com/caelestia-dots/shell).
+> The rest of this README is upstream's.
+>
+> **Changes in this fork**
+>
+> - **Bar:** each monitor's active window title shows that monitor's own window, not the globally focused one
+> - **Launcher:** window switcher mode (`>window`, or `caelestia shell launcher windows`)
+> - **Battery:** smoothed time-to-empty, read from `$XDG_RUNTIME_DIR/battery-estimate.json`, with UPower as the fallback
+> - **Lyrics:** plain (unsynced) lyrics fallback, lrclib search, OpenCC Traditional/Simplified matching. Requires `opencc`.
+> - **Screenshot picker:** capture mode menu (full screen / window / region) via `caelestia shell picker openFreezeMenu`
+> - **Lock:** fingerprint auth restarts after resume from suspend
+> - **Bluetooth:** devices without a name are hidden
+> - **Tray / background:** smaller equibop/Fcitx tray icons, half-height visualiser
+>
+> **Building**
+>
+> The plugin is installed to `~/.local/share/caelestia/lyrics-qml`, not `/usr/lib/qt6/qml`, so no `sudo` is
+> needed. `shell.qml` adds that path to `QML_IMPORT_PATH`. The path is hard-coded for user `hyper`.
+>
+> ```sh
+> cmake -S . -B ~/.cache/caelestia-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_MODULES=plugin \
+>     -DCMAKE_INSTALL_PREFIX=/ -DINSTALL_QMLDIR=$HOME/.local/share/caelestia/lyrics-qml
+> cmake --build ~/.cache/caelestia-build && cmake --install ~/.cache/caelestia-build
+> ```
+>
+> **Syncing with upstream**
+>
+> ```sh
+> git fetch upstream && git merge upstream/main && git push
+> ```
+>
+> If the merge touches `plugin/`, rebuild and restart the shell.
+
 https://github.com/user-attachments/assets/0840f496-575c-4ca6-83a8-87bb01a85c5f
 
 ## Components
