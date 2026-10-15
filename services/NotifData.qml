@@ -89,19 +89,7 @@ QtObject {
                     if (status !== Image.Ready || width != TokenConfig.sizes.notifs.image || height != TokenConfig.sizes.notifs.image)
                         return;
 
-                    const cacheKey = notif.appName + notif.summary + notif.notificationId + notif.image;
-                    let h1 = 0xdeadbeef, h2 = 0x41c6ce57, ch;
-                    for (let i = 0; i < cacheKey.length; i++) {
-                        ch = cacheKey.charCodeAt(i);
-                        h1 = Math.imul(h1 ^ ch, 2654435761);
-                        h2 = Math.imul(h2 ^ ch, 1597334677);
-                    }
-                    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
-                    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-                    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
-                    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-                    const hash = (h2 >>> 0).toString(16).padStart(8, 0) + (h1 >>> 0).toString(16).padStart(8, 0);
-
+                    const hash = notif.cacheHash(notif.appName + notif.summary + notif.notificationId + notif.image);
                     const cache = `${Paths.notifimagecache}/${hash}.png`;
                     CUtils.saveItem(this, Qt.resolvedUrl(cache), () => {
                         notif.image = cache;
@@ -138,6 +126,7 @@ QtObject {
 
         function onAppIconChanged(): void {
             notif.appIcon = notif.notification.appIcon;
+            notif.maybeCacheAppIcon();
         }
 
         function onAppNameChanged(): void {
@@ -202,8 +191,46 @@ QtObject {
         }
     }
 
+    function cacheHash(key: string): string {
+        let h1 = 0xdeadbeef, h2 = 0x41c6ce57, ch;
+        for (let i = 0; i < key.length; i++) {
+            ch = key.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+        h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+        h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        return (h2 >>> 0).toString(16).padStart(8, 0) + (h1 >>> 0).toString(16).padStart(8, 0);
+    }
+
+    // Apps like Chromium pass files from temp dirs that are deleted once the notification closes,
+    // so local files are copied synchronously on arrival instead of rendered async by the dummy loader
+    // Returns a plain path since the icon provider (QIcon::fromTheme) only resolves absolute paths, not file:// urls
+    function copyToCache(path: string): string {
+        // Quickshell wraps image-path hints as image://icon/<path>
+        const src = path.replace(/^image:\/\/icon\/(?=\/)/, "").replace(/^file:\/\//, "");
+        if (!src.startsWith("/") || src.startsWith(`${Paths.notifimagecache}/`))
+            return "";
+
+        const name = src.slice(src.lastIndexOf("/") + 1);
+        const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+        const cache = `${Paths.notifimagecache}/${cacheHash(appName + notificationId + src)}${ext}`;
+        return CUtils.copyFile(`file://${src}`, `file://${cache}`) ? cache : "";
+    }
+
+    function maybeCacheAppIcon(): void {
+        const cache = copyToCache(appIcon);
+        if (cache)
+            appIcon = cache;
+    }
+
     function maybeTriggerDummyImageLoader(): void {
-        if (image && !image.startsWith("image://icon/") && !image.startsWith(Paths.notifimagecache))
+        const cache = copyToCache(image);
+        if (cache)
+            image = cache;
+        else if (image && !image.startsWith("image://icon/") && !image.startsWith(Paths.notifimagecache))
             dummyImageLoader.active = true;
     }
 
@@ -235,6 +262,7 @@ QtObject {
         body = notification.body;
         appIcon = notification.appIcon;
         appName = notification.appName;
+        maybeCacheAppIcon();
         image = notification.image;
         maybeTriggerDummyImageLoader();
         expireTimeout = notification.expireTimeout;
