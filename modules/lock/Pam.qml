@@ -144,15 +144,26 @@ Scope {
         maxTries: GlobalConfig.lock.maxHowdyTries
     }
 
+    Timer {
+        id: fprintResumeDelay
+
+        // fprintd needs time to resume the device; starting immediately burns all error retries.
+        interval: 2000
+        onTriggered: {
+            if (root.lock.secure && !fprint.active)
+                root.restartFprint();
+        }
+    }
+
     Connections {
         function onAboutToSleep(): void {
             root.sleeping = true;
+            fprintResumeDelay.stop();
         }
 
         function onResumed(): void {
             root.sleeping = false;
-            if (root.lock.secure && !fprint.active)
-                root.restartFprint();
+            fprintResumeDelay.restart();
             if (howdy.canAttempt && !howdy.active && GlobalConfig.lock.triggerHowdyOnWake)
                 howdy.start();
         }
@@ -285,6 +296,9 @@ Scope {
             onTriggered: {
                 if (ctx.state !== Pam.MaxTries)
                     ctx.state = Pam.None;
+                // Error retries exhausted; start again instead of staying dead until next resume/lock.
+                if (ctx.retryOnFail && ctx.errorTries >= 5 && ctx.canAttempt && !pam.active && !root.sleeping)
+                    pam.start();
                 ctx.errorTries = 0;
             }
         }
