@@ -7,6 +7,7 @@ import Quickshell.Services.Mpris
 import Caelestia
 import Caelestia.Config
 import Caelestia.I18n
+import Caelestia.Services
 import qs.components.misc
 
 Singleton {
@@ -18,6 +19,16 @@ Singleton {
 
     // Dedup key for progressive metadata (e.g. mpv-mpris/yt-dlp player fills title then artist later).
     property string lastNowPlayingKey: ""
+
+    // Funny binding hack to make lyrics update
+    // Lives here (always loaded) so lyrics follow the track even when no lyrics UI is open
+    readonly property var _lyricsTrack: {
+        const p = active;
+        if (p)
+            Lyrics.setTrack(p.trackArtist, p.trackTitle, p.trackAlbum, p.length);
+        else
+            Lyrics.clearTrack();
+    }
 
     function getIdentity(player: MprisPlayer): string {
         if (!player)
