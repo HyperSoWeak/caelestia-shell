@@ -263,14 +263,15 @@ Scope {
                     ctx.errorTries++;
                     if (ctx.errorTries < 5) {
                         abort();
-                        errorRetry.restart();
+                        retryDelay.restart();
                     }
                 } else if (res === PamResult.MaxTries || res === PamResult.Failed) {
                     ctx.tries++;
                     if (ctx.tries < ctx.maxTries) {
                         ctx.state = Pam.Failed;
+                        // Restarting immediately races fprintd releasing the killed conversation's claim
                         if (ctx.retryOnFail)
-                            start();
+                            retryDelay.restart();
                     } else {
                         ctx.state = Pam.MaxTries;
                         abort();
@@ -283,7 +284,7 @@ Scope {
         }
 
         Timer {
-            id: errorRetry
+            id: retryDelay
 
             interval: 800
             onTriggered: pam.start()
