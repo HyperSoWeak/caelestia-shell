@@ -13,12 +13,8 @@ RowLayout {
 
     ColumnLayout {
         Layout.fillWidth: true
+        Layout.fillHeight: true
         spacing: Tokens.spacing.medium
-
-        WeatherInfo {
-            Layout.fillWidth: true
-            rootHeight: root.height
-        }
 
         Fetch {
             Layout.fillWidth: true
@@ -30,31 +26,15 @@ RowLayout {
             Layout.fillHeight: true
             lock: root.lock
         }
-    }
-
-    Center {
-        lock: root.lock
-    }
-
-    ColumnLayout {
-        Layout.fillWidth: true
-        spacing: Tokens.spacing.medium
 
         Resources {
             Layout.fillWidth: true
         }
+    }
 
-        StyledRect {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            bottomRightRadius: Tokens.rounding.extraLarge
-            radius: Tokens.rounding.medium
-            color: Colours.tPalette.m3surfaceContainer
-
-            NotifDock {
-                lock: root.lock
-            }
-        }
+    Center {
+        Layout.fillHeight: false
+        Layout.alignment: Qt.AlignVCenter
+        lock: root.lock
     }
 }
