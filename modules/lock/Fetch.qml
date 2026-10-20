@@ -16,9 +16,21 @@ StyledRect {
 
     required property real rootHeight
     readonly property int cBoxSize: Tokens.font.body.medium.pointSize * 2
+    readonly property var info: {
+        // Flat key/value pairs for the 2-column grid
+        const items = [Tr.tr("OS"), SysInfo.osPrettyName || SysInfo.osName, Tr.tr("WM"), SysInfo.wm, Tr.tr("USER"), SysInfo.user, Tr.tr("UP"), SysInfo.uptimeShort];
 
-    implicitHeight: layout.implicitHeight + layout.anchors.topMargin + layout.anchors.margins
-    radius: Tokens.rounding.medium
+        if (UPower.displayDevice.isLaptopBattery) {
+            const charging = [UPowerDeviceState.Charging, UPowerDeviceState.FullyCharged, UPowerDeviceState.PendingCharge].includes(UPower.displayDevice.state);
+            const pct = Math.round(UPower.displayDevice.percentage * 100);
+            items.push(Tr.tr("BATT"), charging ? `${pct}% (+)` : `${pct}%`);
+        }
+
+        return items;
+    }
+
+    implicitHeight: layout.implicitHeight + Tokens.padding.extraLarge * 2
+    radius: Tokens.rounding.extraLarge
     color: Colours.tPalette.m3surfaceContainer
 
     ColumnLayout {
@@ -26,116 +38,53 @@ StyledRect {
 
         anchors.fill: parent
         anchors.margins: Tokens.padding.extraLarge
-        anchors.topMargin: Tokens.padding.extraLarge
-        anchors.bottomMargin: Tokens.padding.extraLarge
-
-        spacing: Tokens.spacing.small
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: false
-            spacing: Tokens.spacing.medium
-
-            StyledRect {
-                implicitWidth: prompt.implicitWidth + Tokens.padding.medium * 2
-                implicitHeight: prompt.implicitHeight + Tokens.padding.small * 2
-
-                color: Colours.palette.m3primary
-                radius: Tokens.rounding.medium
-
-                MonoText {
-                    id: prompt
-
-                    anchors.centerIn: parent
-                    text: ">"
-                    color: Colours.palette.m3onPrimary
-                }
-            }
-
-            MonoText {
-                Layout.fillWidth: true
-                text: "caelestiafetch.sh"
-                elide: Text.ElideRight
-            }
-
-            WrappedLoader {
-                Layout.fillHeight: true
-                Layout.preferredWidth: height
-                Layout.preferredHeight: 0
-                active: !iconLoader.active
-
-                sourceComponent: SysInfo.isDefaultLogo ? caelestiaLogo : distroIcon
-            }
-        }
+        spacing: Tokens.spacing.large
 
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Tokens.spacing.extraLarge
 
-            WrappedLoader {
-                id: iconLoader
+            Loader {
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: height
+                Layout.preferredHeight: infoGrid.implicitHeight * 0.75
 
-                Layout.fillHeight: true
-                active: root.width > Tokens.sizes.lock.largeLogoWidth
-
+                asynchronous: true
                 sourceComponent: SysInfo.isDefaultLogo ? caelestiaLogo : distroIcon
             }
 
-            ColumnLayout {
+            GridLayout {
+                id: infoGrid
+
                 Layout.fillWidth: true
-                Layout.topMargin: Tokens.padding.medium
-                Layout.bottomMargin: iconLoader.active || colourRowLoader.active ? Tokens.padding.medium : 0
-                spacing: Tokens.spacing.medium
+                Layout.alignment: Qt.AlignVCenter
+
+                columns: 2
+                columnSpacing: Tokens.spacing.large
+                rowSpacing: Tokens.spacing.small
 
                 Repeater {
-                    model: {
-                        const items = [];
-                        const hasBatt = UPower.displayDevice.isLaptopBattery;
-                        const rHeight = root.rootHeight;
-
-                        if (!hasBatt && rHeight > Tokens.sizes.lock.fetch4LinesHeight)
-                            // TRANSLATORS: keep the label padded to 4 chars so the column stays aligned
-                            items.push(Tr.tr("OS  : %1").arg(SysInfo.osPrettyName || SysInfo.osName));
-
-                        if (rHeight > (hasBatt ? Tokens.sizes.lock.fetch4LinesHeight : Tokens.sizes.lock.fetch3LinesHeight))
-                            // TRANSLATORS: keep the label padded to 4 chars so the column stays aligned
-                            items.push(Tr.tr("WM  : %1").arg(SysInfo.wm));
-
-                        if (!hasBatt || rHeight > Tokens.sizes.lock.fetch3LinesHeight)
-                            // TRANSLATORS: keep the label padded to 4 chars so the column stays aligned
-                            items.push(Tr.tr("USER: %1").arg(SysInfo.user));
-
-                        // TRANSLATORS: keep the label padded to 4 chars so the column stays aligned
-                        items.push(Tr.tr("UP  : %1").arg(SysInfo.uptime));
-
-                        if (hasBatt) {
-                            const charging = [UPowerDeviceState.Charging, UPowerDeviceState.FullyCharged, UPowerDeviceState.PendingCharge].includes(UPower.displayDevice.state);
-                            const pct = Math.round(UPower.displayDevice.percentage * 100);
-                            // TRANSLATORS: keep the label padded to 4 chars, (+) marks charging
-                            items.push(charging ? Tr.tr("BATT: (+) %1%").arg(pct) : Tr.tr("BATT: %1%").arg(pct));
-                        }
-
-                        return items;
-                    }
+                    model: root.info
 
                     MonoText {
                         required property string modelData
+                        required property int index
 
-                        Layout.fillWidth: true
+                        Layout.fillWidth: index % 2 === 1
                         text: modelData
+                        color: index % 2 === 0 ? Colours.palette.m3primary : Colours.palette.m3onSurface
                         elide: Text.ElideRight
                     }
                 }
             }
         }
 
-        WrappedLoader {
-            id: colourRowLoader
-
-            Layout.topMargin: iconLoader.active ? Tokens.spacing.small : 0
+        Loader {
             Layout.alignment: Qt.AlignHCenter
             active: root.rootHeight > Tokens.sizes.lock.showColourBoxRowHeight
+            visible: active
+            asynchronous: true
 
             sourceComponent: RowLayout {
                 id: coloursRow
@@ -177,12 +126,7 @@ StyledRect {
         }
     }
 
-    component WrappedLoader: Loader {
-        asynchronous: true
-        visible: active
-    }
-
     component MonoText: StyledText {
-        font: root.width > Tokens.sizes.lock.largeFontWidth ? Tokens.font.mono.medium : Tokens.font.mono.small
+        font: root.width > Tokens.sizes.lock.largeFontWidth ? Tokens.font.mono.large : Tokens.font.mono.medium
     }
 }
