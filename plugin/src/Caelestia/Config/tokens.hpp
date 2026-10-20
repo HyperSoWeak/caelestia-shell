@@ -192,7 +192,7 @@ class LockTokens : public settings::ObjectNode {
     CONFIG_NODE(LockTokens, settings::ObjectNode)
 
     CONFIG_PROPERTY(qreal, heightMult, 0.7)
-    CONFIG_PROPERTY(qreal, ratio, 16.0 / 9.0)
+    CONFIG_PROPERTY(qreal, ratio, 4.0 / 3.0)
     CONFIG_PROPERTY(int, centerWidth, 600)
     CONFIG_PROPERTY(int, showWeatherDetailsHeight, 550)
     CONFIG_PROPERTY(int, showForecastHeight, 975)

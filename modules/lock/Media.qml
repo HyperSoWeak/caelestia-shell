@@ -60,7 +60,7 @@ StyledClippingRect {
             text: (Players.active?.trackTitle ?? Tr.tr("Nothing playing")) || Tr.tr("Unknown track")
             color: Colours.palette.m3primary
             horizontalAlignment: Text.AlignHCenter
-            font: Tokens.font.title.medium
+            font: Tokens.font.title.large
             elide: Text.ElideRight
         }
 
@@ -70,7 +70,7 @@ StyledClippingRect {
             text: (Players.active?.trackArtist ?? Tr.tr("Try playing some music!")) || Tr.tr("Unknown artist")
             color: Colours.palette.m3onSurfaceVariant
             horizontalAlignment: Text.AlignHCenter
-            font: Tokens.font.body.small
+            font: Tokens.font.body.medium
             elide: Text.ElideRight
         }
 
@@ -85,6 +85,7 @@ StyledClippingRect {
                 icon: "skip_previous"
                 isRound: true
                 shapeMorph: true
+                padding: Tokens.padding.medium
                 disabled: !Players.active?.canGoPrevious
                 onClicked: Players.active?.previous()
             }
@@ -93,6 +94,7 @@ StyledClippingRect {
                 icon: Players.active?.isPlaying ? "pause" : "play_arrow"
                 isRound: true
                 shapeMorph: true
+                padding: Tokens.padding.medium
                 checked: Players.active?.isPlaying ?? false
                 disabled: !Players.active?.canTogglePlaying
                 onClicked: Players.active?.togglePlaying()
@@ -104,6 +106,7 @@ StyledClippingRect {
                 icon: "skip_next"
                 isRound: true
                 shapeMorph: true
+                padding: Tokens.padding.medium
                 disabled: !Players.active?.canGoNext
                 onClicked: Players.active?.next()
             }
