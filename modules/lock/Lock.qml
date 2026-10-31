@@ -12,6 +12,14 @@ Scope {
     id: root
 
     property alias lock: lock
+    // Idle locks leave the displays to the idle timeouts, only explicit locks turn them off
+    property bool blank
+
+    function lockAndBlank(): void {
+        blank = true;
+        lock.locked = true;
+        dpmsOffDelay.restart();
+    }
 
     function wakeDisplays(): void {
         dpmsOffDelay.stop();
@@ -37,10 +45,10 @@ Scope {
 
     Connections {
         function onLockedChanged(): void {
-            if (lock.locked)
-                dpmsOffDelay.restart();
-            else
+            if (!lock.locked) {
+                root.blank = false;
                 root.wakeDisplays();
+            }
         }
 
         function onUnlock(): void {
@@ -69,7 +77,7 @@ Scope {
 
     // Input wakes the displays while locked, so turn them back off once it stops
     IdleMonitor {
-        enabled: lock.locked
+        enabled: root.blank
         timeout: 30
         respectInhibitors: false
         onIsIdleChanged: {
@@ -97,7 +105,7 @@ Scope {
         // qmllint enable unresolved-type
         name: "lock"
         description: "Lock the current session"
-        onPressed: lock.locked = true
+        onPressed: root.lockAndBlank()
     }
 
     // qmllint disable unresolved-type
@@ -110,7 +118,7 @@ Scope {
 
     IpcHandler {
         function lock(): void {
-            lock.locked = true;
+            root.lockAndBlank();
         }
 
         function unlock(): void {

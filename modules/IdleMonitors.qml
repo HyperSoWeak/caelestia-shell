@@ -16,6 +16,9 @@ Scope {
     readonly property bool hasPlayer: Players.list.some(p => p.isPlaying)
     readonly property bool isCharging: !UPower.onBattery
     readonly property bool enabled: {
+        // Timeouts with respectInhibitors off would otherwise still fire during keep awake
+        if (IdleInhibitor.enabled)
+            return false;
         if (GlobalConfig.general.idle.inhibitWhenAudio && hasPlayer)
             return false;
         if (GlobalConfig.general.idle.inhibitWhenCharging && isCharging)
@@ -44,7 +47,7 @@ Scope {
         }
 
         function onLockRequested(): void {
-            root.lock.lock.locked = true;
+            root.lock.lockAndBlank();
         }
 
         function onUnlockRequested(): void {

@@ -166,7 +166,7 @@ WlSessionLockSurface {
             autoPaddingEnabled: false
             blurEnabled: true
             blur: 1
-            blurMax: 16
+            blurMax: 64
             blurMultiplier: 1
         }
 
