@@ -12,6 +12,8 @@ Scope {
     id: root
 
     property alias lock: lock
+    // WlSessionLock doesn't notify when locked goes false, so a binding on it would never turn off
+    property bool blankOnIdle
 
     function lockAndBlank(): void {
         lock.locked = true;
@@ -42,11 +44,11 @@ Scope {
 
     Connections {
         function onLockedChanged(): void {
-            if (!lock.locked)
-                root.wakeDisplays();
+            root.blankOnIdle = lock.locked;
         }
 
         function onUnlock(): void {
+            root.blankOnIdle = false;
             root.wakeDisplays();
         }
 
@@ -73,11 +75,11 @@ Scope {
     // However the session was locked, and regardless of inhibitors like keep awake,
     // don't leave the displays on once input stops
     IdleMonitor {
-        enabled: lock.locked
+        enabled: root.blankOnIdle
         timeout: 30
         respectInhibitors: false
         onIsIdleChanged: {
-            if (isIdle)
+            if (isIdle && lock.locked)
                 Hypr.setDpms(false);
         }
     }
