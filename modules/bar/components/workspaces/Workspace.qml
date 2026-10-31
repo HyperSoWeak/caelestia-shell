@@ -14,10 +14,10 @@ import qs.utils
 Item {
     id: root
 
-    required property int modelData
+    required property var modelData
     required property int index
-    required property int activeWsId
-    required property int ws
+    required property var activeWsId
+    required property var ws
     required property HyprlandMonitor monitor
 
     required property int displayType
@@ -37,7 +37,7 @@ Item {
     readonly property bool onOtherMonitor: {
         if (Config.bar.workspaces.perMonitor)
             return false;
-        const mon = Hypr.workspaces.values.find(w => w.id === ws)?.monitor;
+        const mon = Hypr.workspaceFor(ws)?.monitor;
         return !!(mon && mon !== monitor);
     }
     readonly property color fgColour: {
@@ -128,7 +128,7 @@ Item {
                 if (label)
                     return label;
 
-                const ws = Hypr.workspaces.values.find(w => w.id === root.ws);
+                const ws = Hypr.workspaceFor(root.ws);
                 const wsName = !ws || ws.name == root.ws ? root.ws : Hypr.trimWsName(ws.name)[0];
 
                 const capitalisation = Config.bar.workspaces.capitalisation;
@@ -252,7 +252,7 @@ Item {
 
         property string name
         readonly property string icon: Icons.matchIconRuleList(Hypr.trimWsName(name), root.iconRules)
-        readonly property HyprlandWorkspace wsObj: Hypr.workspaces.values.find(w => w.id === root.ws) ?? null
+        readonly property HyprlandWorkspace wsObj: Hypr.workspaceFor(root.ws)
 
         readonly property Connections conn: Connections {
             function onNameChanged(): void {

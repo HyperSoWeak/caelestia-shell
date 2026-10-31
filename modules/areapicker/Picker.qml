@@ -70,8 +70,7 @@ MouseArea {
         if (!mon)
             return [];
 
-        const special = mon.lastIpcObject?.specialWorkspace;
-        const wsId = special?.name ? special.id : mon.activeWorkspace?.id;
+        const wsId = Hypr.specialWsAddress(mon) || mon.activeWorkspace?.id;
         if (wsId === undefined)
             return [];
 

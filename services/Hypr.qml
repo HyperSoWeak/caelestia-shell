@@ -113,8 +113,18 @@ Singleton {
         return name.startsWith("special:") ? name.slice("special:".length) : name;
     }
 
-    function toplevelsForWs(ws: int, ignoredTags = []): list<HyprlandToplevel> {
-        return toplevels.values.filter(t => t.workspace && t.workspace.id === ws && !isToplevelIgnored(t, ignoredTags));
+    // Keyed by address, since Hyprland 0.57 special workspaces have no id (Quickshell reports -1 for all of them)
+    function workspaceFor(ws: var): HyprlandWorkspace {
+        return workspaces.values.find(w => w.address === String(ws)) ?? null;
+    }
+
+    function specialWsAddress(mon: HyprlandMonitor): string {
+        const name = mon?.lastIpcObject.specialWorkspace?.name;
+        return workspaces.values.find(w => w.name === name)?.address ?? "";
+    }
+
+    function toplevelsForWs(ws: var, ignoredTags = []): list<HyprlandToplevel> {
+        return toplevels.values.filter(t => t.workspace && t.workspace.address === String(ws) && !isToplevelIgnored(t, ignoredTags));
     }
 
     function isToplevelIgnored(toplevel: HyprlandToplevel, ignoredTags = []): bool {
