@@ -8,6 +8,7 @@ import Quickshell.Services.UPower
 import Caelestia.Config
 import Caelestia.Services
 import qs.services
+import qs.services as Services
 
 Scope {
     id: root
@@ -16,8 +17,9 @@ Scope {
     readonly property bool hasPlayer: Players.list.some(p => p.isPlaying)
     readonly property bool isCharging: !UPower.onBattery
     readonly property bool enabled: {
-        // Timeouts with respectInhibitors off would otherwise still fire during keep awake
-        if (IdleInhibitor.enabled)
+        // Timeouts with respectInhibitors off would otherwise still fire during keep awake.
+        // Qualified since a bare IdleInhibitor resolves to the Quickshell.Wayland type.
+        if (Services.IdleInhibitor.enabled)
             return false;
         if (GlobalConfig.general.idle.inhibitWhenAudio && hasPlayer)
             return false;
