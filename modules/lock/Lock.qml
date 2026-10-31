@@ -12,11 +12,8 @@ Scope {
     id: root
 
     property alias lock: lock
-    // Idle locks leave the displays to the idle timeouts, only explicit locks turn them off
-    property bool blank
 
     function lockAndBlank(): void {
-        blank = true;
         lock.locked = true;
         dpmsOffDelay.restart();
     }
@@ -45,10 +42,8 @@ Scope {
 
     Connections {
         function onLockedChanged(): void {
-            if (!lock.locked) {
-                root.blank = false;
+            if (!lock.locked)
                 root.wakeDisplays();
-            }
         }
 
         function onUnlock(): void {
@@ -75,9 +70,10 @@ Scope {
         onTriggered: Hypr.setDpms(false)
     }
 
-    // Input wakes the displays while locked, so turn them back off once it stops
+    // However the session was locked, and regardless of inhibitors like keep awake,
+    // don't leave the displays on once input stops
     IdleMonitor {
-        enabled: root.blank
+        enabled: lock.locked
         timeout: 30
         respectInhibitors: false
         onIsIdleChanged: {
