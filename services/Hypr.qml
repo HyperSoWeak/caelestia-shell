@@ -44,6 +44,10 @@ Singleton {
         Hyprland.dispatch(request);
     }
 
+    function setDpms(on: bool): void {
+        dispatch(usingLua ? `hl.dsp.dpms({ action = "${on ? "enable" : "disable"}" })` : `dpms ${on ? "on" : "off"}`);
+    }
+
     function focusWorkspace(ws: var): void {
         dispatch(usingLua ? `hl.dsp.focus({ workspace = "${ws}" })` : `workspace ${ws}`);
     }

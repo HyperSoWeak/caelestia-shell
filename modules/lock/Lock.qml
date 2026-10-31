@@ -4,10 +4,19 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Caelestia.Services
 import qs.components.misc
+import qs.services
 
 Scope {
+    id: root
+
     property alias lock: lock
+
+    function wakeDisplays(): void {
+        dpmsOffDelay.stop();
+        Hypr.setDpms(true);
+    }
 
     WlSessionLock {
         id: lock
@@ -24,6 +33,49 @@ Scope {
         id: pam
 
         lock: lock
+    }
+
+    Connections {
+        function onLockedChanged(): void {
+            if (lock.locked)
+                dpmsOffDelay.restart();
+            else
+                root.wakeDisplays();
+        }
+
+        function onUnlock(): void {
+            root.wakeDisplays();
+        }
+
+        target: lock
+    }
+
+    Connections {
+        function onResumed(): void {
+            if (lock.locked)
+                root.wakeDisplays();
+        }
+
+        target: SessionManager
+    }
+
+    Timer {
+        id: dpmsOffDelay
+
+        // Let the lock surface capture the screen first, and the key release from the lock bind pass
+        interval: 1000
+        onTriggered: Hypr.setDpms(false)
+    }
+
+    // Input wakes the displays while locked, so turn them back off once it stops
+    IdleMonitor {
+        enabled: lock.locked
+        timeout: 30
+        respectInhibitors: false
+        onIsIdleChanged: {
+            if (isIdle)
+                Hypr.setDpms(false);
+        }
     }
 
     Loader {

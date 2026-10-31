@@ -144,7 +144,7 @@ WlSessionLockSurface {
                 Anim {
                     target: lockContent
                     property: "implicitWidth"
-                    to: (root.screen?.height ?? 0) * lockContent.Tokens.sizes.lock.heightMult * lockContent.Tokens.sizes.lock.ratio
+                    to: content.centerWidth + lockContent.Tokens.padding.extraLargeIncreased * 2
                 }
                 Anim {
                     target: lockContent
@@ -166,7 +166,7 @@ WlSessionLockSurface {
             autoPaddingEnabled: false
             blurEnabled: true
             blur: 1
-            blurMax: 64
+            blurMax: 16
             blurMultiplier: 1
         }
 
@@ -231,12 +231,11 @@ WlSessionLockSurface {
             rotation: 180
         }
 
-        Content {
+        Center {
             id: content
 
             anchors.centerIn: parent
-            width: (root.screen?.height ?? 0) * Tokens.sizes.lock.heightMult * Tokens.sizes.lock.ratio - Tokens.padding.extraLargeIncreased
-            height: (root.screen?.height ?? 0) * Tokens.sizes.lock.heightMult - Tokens.padding.extraLargeIncreased
+            width: centerWidth
 
             lock: root
             opacity: 0
