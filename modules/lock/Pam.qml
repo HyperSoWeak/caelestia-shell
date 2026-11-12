@@ -256,15 +256,22 @@ Scope {
                 if (res === PamResult.Success)
                     return root.lock.unlock();
 
+                if (res === PamResult.Error) {
+                    ctx.errorTries++;
+                    // fprintd and we both get PrepareForSleep, so it often errors ("Cannot run while
+                    // suspended") before sleeping is set. Retry transient errors silently; only a burst is shown.
+                    if (ctx.errorTries < 5) {
+                        abort();
+                        retryDelay.restart();
+                        stateReset.restart();
+                        return;
+                    }
+                }
+
                 root.clearTransientState();
 
                 if (res === PamResult.Error) {
                     ctx.state = Pam.Error;
-                    ctx.errorTries++;
-                    if (ctx.errorTries < 5) {
-                        abort();
-                        retryDelay.restart();
-                    }
                 } else if (res === PamResult.MaxTries || res === PamResult.Failed) {
                     ctx.tries++;
                     if (ctx.tries < ctx.maxTries) {
