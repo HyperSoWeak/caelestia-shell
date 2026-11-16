@@ -159,6 +159,8 @@ Scope {
         function onAboutToSleep(): void {
             root.sleeping = true;
             fprintResumeDelay.stop();
+            // An error retry queued just before sleep would otherwise fire right at thaw and burn retries.
+            fprint.pause();
         }
 
         function onResumed(): void {
@@ -218,6 +220,7 @@ Scope {
         property bool available
         property int tries
         property int errorTries
+        readonly property int maxErrorTries: 10
         property int state
         readonly property bool canAttempt: available && enabled && root.lock.secure && tries < maxTries
 
@@ -235,6 +238,12 @@ Scope {
         }
 
         function abort(): void {
+            pam.abort();
+        }
+
+        function pause(): void {
+            retryDelay.stop();
+            stateReset.stop();
             pam.abort();
         }
 
@@ -259,8 +268,9 @@ Scope {
                 if (res === PamResult.Error) {
                     ctx.errorTries++;
                     // fprintd and we both get PrepareForSleep, so it often errors ("Cannot run while
-                    // suspended") before sleeping is set. Retry transient errors silently; only a burst is shown.
-                    if (ctx.errorTries < 5) {
+                    // suspended") before sleeping is set, and after resume Claim keeps failing for several
+                    // seconds while fprintd releases the pre-sleep claim. Retry silently; only a long burst is shown.
+                    if (ctx.errorTries < ctx.maxErrorTries) {
                         abort();
                         retryDelay.restart();
                         stateReset.restart();
@@ -293,7 +303,7 @@ Scope {
         Timer {
             id: retryDelay
 
-            interval: 800
+            interval: ctx.errorTries > 0 ? 1500 : 800
             onTriggered: pam.start()
         }
 
@@ -305,7 +315,7 @@ Scope {
                 if (ctx.state !== Pam.MaxTries)
                     ctx.state = Pam.None;
                 // Error retries exhausted; start again instead of staying dead until next resume/lock.
-                if (ctx.retryOnFail && ctx.errorTries >= 5 && ctx.canAttempt && !pam.active && !root.sleeping)
+                if (ctx.retryOnFail && ctx.errorTries >= ctx.maxErrorTries && ctx.canAttempt && !pam.active && !root.sleeping)
                     pam.start();
                 ctx.errorTries = 0;
             }
