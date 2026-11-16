@@ -62,6 +62,11 @@ Scope {
     }
 
     function restartFprint(): void {
+        // Locking on lid close races PrepareForSleep; a verify started mid-suspend leaves fprintd's device
+        // stuck busy until fprintd exits. fprintResumeDelay starts it after resume instead.
+        if (sleeping)
+            return;
+
         fprint.reset();
         if (fprint.canAttempt)
             fprint.start();
