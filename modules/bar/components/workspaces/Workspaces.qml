@@ -17,8 +17,9 @@ StyledClippingRect {
     required property bool fullscreen
 
     readonly property HyprlandMonitor monitor: Hypr.monitorFor(screen)
-    readonly property bool onSpecial: monitor?.lastIpcObject.specialWorkspace?.name !== ""
-    readonly property int activeWsId: monitor.activeWorkspace?.id ?? 1
+    readonly property bool onSpecial: monitor?.lastIpcObject.specialWorkspace?.name !== "" || Hypr.isNamedWs(monitor?.activeWorkspace ?? null)
+    // Keeps the last numbered workspace while on a named one (which has no id)
+    property int activeWsId: 1
     readonly property int activeWsIdx: workspaceIndex(activeWsId)
     readonly property int shown: Math.max(1, Config.bar.workspaces.shown)
 
@@ -54,6 +55,12 @@ StyledClippingRect {
     }
 
     property real blur: onSpecial ? 1 : 0
+
+    Binding on activeWsId {
+        when: (root.monitor?.activeWorkspace?.id ?? 0) > 0
+        value: root.monitor?.activeWorkspace?.id ?? 1
+        restoreMode: Binding.RestoreNone
+    }
 
     function workspaceIndex(id: int): int {
         if (!Config.bar.workspaces.showUnoccupied)
