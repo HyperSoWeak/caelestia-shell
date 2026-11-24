@@ -18,7 +18,9 @@ Item {
     readonly property string activeSpecialAddress: Hypr.specialWsAddress(monitor) || (Hypr.isNamedWs(monitor?.activeWorkspace ?? null) ? monitor.activeWorkspace.address : "")
     readonly property var wsAddresses: {
         const allMonitors = !Config.bar.workspaces.perMonitor;
-        return Hypr.workspaces.values.filter(w => (w.name.startsWith("special:") || Hypr.isNamedWs(w)) && (allMonitors || w.monitor === root.monitor)).map(w => w.address);
+        const ignoredTags = GlobalConfig.bar.workspaces.ignoredTags;
+        // Skip workspaces holding only ignored windows (e.g. a stash for hidden helper windows)
+        return Hypr.workspaces.values.filter(w => (w.name.startsWith("special:") || Hypr.isNamedWs(w)) && (allMonitors || w.monitor === root.monitor) && (w.address === root.activeSpecialAddress || w.toplevels.values.some(t => !Hypr.isToplevelIgnored(t, ignoredTags)))).map(w => w.address);
     }
     readonly property int activeIdx: wsAddresses.indexOf(activeSpecialAddress)
     readonly property real maxViewY: Math.max(0, view.contentHeight - height)
