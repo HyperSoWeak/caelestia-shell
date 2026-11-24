@@ -122,6 +122,11 @@ Singleton {
         return workspaces.values.find(w => w.address === String(ws)) ?? null;
     }
 
+    // Named workspaces also have no id in Hyprland 0.57; the bar groups them with special ones
+    function isNamedWs(ws: HyprlandWorkspace): bool {
+        return !!ws && ws.id < 1 && !ws.name.startsWith("special:");
+    }
+
     function specialWsAddress(mon: HyprlandMonitor): string {
         const name = mon?.lastIpcObject.specialWorkspace?.name;
         return workspaces.values.find(w => w.name === name)?.address ?? "";

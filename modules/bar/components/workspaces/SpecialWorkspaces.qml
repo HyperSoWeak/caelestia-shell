@@ -15,10 +15,10 @@ Item {
 
     required property HyprlandMonitor monitor
 
-    readonly property string activeSpecialAddress: Hypr.specialWsAddress(monitor)
+    readonly property string activeSpecialAddress: Hypr.specialWsAddress(monitor) || (Hypr.isNamedWs(monitor?.activeWorkspace ?? null) ? monitor.activeWorkspace.address : "")
     readonly property var wsAddresses: {
         const allMonitors = !Config.bar.workspaces.perMonitor;
-        return Hypr.workspaces.values.filter(w => w.name.startsWith("special:") && (allMonitors || w.monitor === root.monitor)).map(w => w.address);
+        return Hypr.workspaces.values.filter(w => (w.name.startsWith("special:") || Hypr.isNamedWs(w)) && (allMonitors || w.monitor === root.monitor)).map(w => w.address);
     }
     readonly property int activeIdx: wsAddresses.indexOf(activeSpecialAddress)
     readonly property real maxViewY: Math.max(0, view.contentHeight - height)
@@ -224,7 +224,9 @@ Item {
             const ws = view.itemAt(event.x, event.y - view.y) as Workspace;
             if (ws) {
                 const match = Hypr.workspaceFor(ws.ws);
-                if (match)
+                if (match && Hypr.isNamedWs(match))
+                    Hypr.focusWorkspace(match.address === root.activeSpecialAddress ? "previous" : `name:${match.name}`);
+                else if (match)
                     Hypr.toggleSpecial(Hypr.trimWsName(match.name));
             } else {
                 Hypr.toggleSpecial("special");
