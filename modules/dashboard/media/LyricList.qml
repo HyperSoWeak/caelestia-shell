@@ -17,6 +17,8 @@ Item {
 
     readonly property real fadeAmount: 0.1
     property list<string> lyricList: Lyrics.lyrics
+    property bool showRomanization
+    property bool showTranslation
 
     layer.enabled: true
     layer.effect: Mask {
@@ -247,20 +249,51 @@ Item {
         opacity: 0
         enabled: opacity > 0
 
-        delegate: StyledText {
+        delegate: Item {
             id: lyric
 
             required property string modelData
             required property int index
             property real effectScale: ListView.isCurrentItem ? 1 : 0
+            readonly property color textColour: !Lyrics.synced ? Colours.palette.m3onSurface : ListView.isCurrentItem ? Colours.palette.m3primary : mouse.containsMouse ? Colours.palette.m3onSurface : Colours.palette.m3outline
 
             anchors.left: lyrics.contentItem.left
             anchors.right: lyrics.contentItem.right
+            implicitHeight: lines.implicitHeight
 
-            text: modelData || (Lyrics.synced ? ". . ." : "")
-            color: !Lyrics.synced ? Colours.palette.m3onSurface : ListView.isCurrentItem ? Colours.palette.m3primary : mouse.containsMouse ? Colours.palette.m3onSurface : Colours.palette.m3outline
-            font: Tokens.font.body.medium
-            wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+            Column {
+                id: lines
+
+                width: parent.width
+
+                StyledText {
+                    width: parent.width
+                    visible: root.showRomanization && text.length > 0
+                    text: Lyrics.romanizations[lyric.index] ?? ""
+                    color: lyric.textColour
+                    opacity: 0.8
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                }
+
+                StyledText {
+                    width: parent.width
+                    text: lyric.modelData || (Lyrics.synced ? ". . ." : "")
+                    color: lyric.textColour
+                    font: Tokens.font.body.medium
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                }
+
+                StyledText {
+                    width: parent.width
+                    visible: root.showTranslation && text.length > 0
+                    text: Lyrics.translations[lyric.index] ?? ""
+                    color: lyric.textColour
+                    opacity: 0.8
+                    font: Tokens.font.body.small
+                    wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                }
+            }
 
             layer.enabled: effectScale > 0
             layer.effect: MultiEffect {

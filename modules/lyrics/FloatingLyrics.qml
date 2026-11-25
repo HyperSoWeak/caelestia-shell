@@ -7,6 +7,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Caelestia.Config
 import Caelestia.I18n
+import Caelestia.Services
 import qs.components
 import qs.components.containers
 import qs.components.controls
@@ -36,6 +37,8 @@ Scope {
             property string screen: ""
             property real x: -1
             property real y: -1
+            property bool showRomanization: false
+            property bool showTranslation: false
         }
     }
 
@@ -162,6 +165,26 @@ Scope {
                                 }
 
                                 IconButton {
+                                    visible: Lyrics.hasRomanization
+                                    isRound: true
+                                    isToggle: true
+                                    checked: adapter.showRomanization
+                                    icon: "match_case"
+                                    type: IconButton.Text
+                                    onClicked: adapter.showRomanization = !adapter.showRomanization
+                                }
+
+                                IconButton {
+                                    visible: Lyrics.hasTranslation
+                                    isRound: true
+                                    isToggle: true
+                                    checked: adapter.showTranslation
+                                    icon: "translate"
+                                    type: IconButton.Text
+                                    onClicked: adapter.showTranslation = !adapter.showTranslation
+                                }
+
+                                IconButton {
                                     isRound: true
                                     icon: "close"
                                     type: IconButton.Text
@@ -173,6 +196,8 @@ Scope {
                         LyricList {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
+                            showRomanization: adapter.showRomanization
+                            showTranslation: adapter.showTranslation
                         }
                     }
                 }

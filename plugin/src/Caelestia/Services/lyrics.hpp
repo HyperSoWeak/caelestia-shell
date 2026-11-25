@@ -1,6 +1,7 @@
 #pragma once
 
 #include <qhash.h>
+#include <qjsonarray.h>
 #include <qjsonobject.h>
 #include <qnetworkaccessmanager.h>
 #include <qnetworkreply.h>
@@ -34,6 +35,10 @@ class Lyrics : public QObject {
     Q_PROPERTY(qreal offset READ offset WRITE setOffset NOTIFY offsetChanged)
     Q_PROPERTY(QString trackArtist READ trackArtist NOTIFY trackChanged)
     Q_PROPERTY(QString trackTitle READ trackTitle NOTIFY trackChanged)
+    Q_PROPERTY(QStringList romanizations READ romanizations NOTIFY extrasChanged)
+    Q_PROPERTY(QStringList translations READ translations NOTIFY extrasChanged)
+    Q_PROPERTY(bool hasRomanization READ hasRomanization NOTIFY extrasChanged)
+    Q_PROPERTY(bool hasTranslation READ hasTranslation NOTIFY extrasChanged)
 
 public:
     explicit Lyrics(QObject* parent = nullptr);
@@ -52,6 +57,10 @@ public:
     void setOffset(qreal value);
     [[nodiscard]] QString trackArtist() const;
     [[nodiscard]] QString trackTitle() const;
+    [[nodiscard]] QStringList romanizations() const;
+    [[nodiscard]] QStringList translations() const;
+    [[nodiscard]] bool hasRomanization() const;
+    [[nodiscard]] bool hasTranslation() const;
 
     [[nodiscard]] Q_INVOKABLE int indexForTime(qreal time) const;
     [[nodiscard]] Q_INVOKABLE qreal timeForIndex(int index) const;
@@ -70,6 +79,7 @@ signals:
     void hasLyricsChanged();
     void offsetChanged();
     void trackChanged();
+    void extrasChanged();
 
 private:
     void setBackend(LyricsBackend value);
@@ -98,6 +108,12 @@ private:
 
     void fetchLrclibById(const QString& id, int reqId);
     void fetchNetEaseLyricsById(const QString& id, int reqId);
+    [[nodiscard]] qint64 bestNetEaseMatch(const QJsonArray& songs, bool matchTitle = true) const;
+
+    void loadExtras();
+    void fetchExtras(const QString& netEaseId, int reqId);
+    void applyExtras(const QJsonObject& data);
+    void clearExtras();
 
     QNetworkReply* getJson(const QUrl& url, const QHash<QByteArray, QByteArray>& headers = {});
     void trackReply(int reqId, QNetworkReply* reply);
@@ -140,6 +156,13 @@ private:
     LyricCandidate m_plainCandidate;
     qreal m_plainScore = 0.0;
     qreal m_offset = 0.0;
+
+    // Romanization/translation from NetEase, index-aligned with m_lyrics
+    QStringList m_romanizations;
+    QStringList m_translations;
+    bool m_hasRomanization = false;
+    bool m_hasTranslation = false;
+    QString m_netEaseId; // NetEase id of the shown lyrics, if they came from NetEase
 
     QString m_artist;
     QString m_title;

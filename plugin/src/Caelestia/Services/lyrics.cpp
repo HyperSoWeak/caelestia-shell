@@ -122,6 +122,14 @@ constexpr qreal k_indexFudge = 0.1;
     return a == b || (std::min(a.size(), b.size()) >= 3 && (a.contains(b) || b.contains(a)));
 }
 
+[[nodiscard]] bool containsKana(const QStringList& lines) {
+    return std::ranges::any_of(lines, [](const QString& line) {
+        return std::ranges::any_of(line, [](QChar c) {
+            return c.unicode() >= 0x3040 && c.unicode() <= 0x30FF;
+        });
+    });
+}
+
 [[nodiscard]] bool durationMatches(qreal expected, qreal actual) {
     return expected <= 0 || (qIsFinite(actual) && actual > 0 && qAbs(expected - actual) <= 10.0);
 }
@@ -151,6 +159,22 @@ Lyrics::Lyrics(QObject* parent)
 
 QStringList Lyrics::lyrics() const {
     return m_lyrics;
+}
+
+QStringList Lyrics::romanizations() const {
+    return m_romanizations;
+}
+
+QStringList Lyrics::translations() const {
+    return m_translations;
+}
+
+bool Lyrics::hasRomanization() const {
+    return m_hasRomanization;
+}
+
+bool Lyrics::hasTranslation() const {
+    return m_hasTranslation;
 }
 
 LyricsBackend Lyrics::backend() const {
@@ -204,6 +228,7 @@ void Lyrics::setSelectedCandidate(const LyricCandidate& value) {
         if (!cached.isEmpty()) {
             const auto lines = parseLrc(cached);
             if (!lines.isEmpty()) {
+                m_netEaseId = b == LyricsBackend::NetEase ? value.id() : QString();
                 setLines(lines, b);
                 setLoading(false);
                 if (!m_settingFromPrefs) {
@@ -366,7 +391,11 @@ void Lyrics::setLines(QVector<LyricLine> lines, LyricsBackend source, bool synce
         list.append(convertChinese(l.text, true));
     }
     m_lyrics = std::move(list);
+    if (source != LyricsBackend::NetEase) {
+        m_netEaseId.clear();
+    }
 
+    clearExtras();
     setBackend(source);
     emit lyricsChanged();
 
@@ -375,6 +404,8 @@ void Lyrics::setLines(QVector<LyricLine> lines, LyricsBackend source, bool synce
         m_hasLyrics = hasLyrics;
         emit hasLyricsChanged();
     }
+
+    loadExtras();
 }
 
 void Lyrics::setPlainLyrics(const QString& text, LyricsBackend source) {
@@ -802,29 +833,8 @@ void Lyrics::tryNetEase(int reqId) {
         }
 
         const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        const QJsonArray songs = doc.object().value(u"result"_s).toObject().value(u"songs"_s).toArray();
-
-        // Match title as well as all artists; don't select a different song by
-        // the same artist just because it appears first in search results.
-        qint64 bestId = -1;
-        qreal bestDifference = std::numeric_limits<qreal>::max();
-        for (const auto& value : songs) {
-            const QJsonObject song = value.toObject();
-            const qreal duration = song.value(u"duration"_s).toDouble() / 1000.0;
-            if (metadataKey(song.value(u"name"_s).toString()) != metadataKey(m_title) ||
-                !durationMatches(m_duration, duration)) {
-                continue;
-            }
-            const QJsonArray artists = song.value(u"artists"_s).toArray();
-            const bool matches = std::ranges::any_of(artists, [this](const QJsonValue& artist) {
-                return artistMatches(m_artist, artist.toObject().value(u"name"_s).toString());
-            });
-            const qreal difference = m_duration > 0 ? qAbs(m_duration - duration) : 0.0;
-            if (matches && difference < bestDifference) {
-                bestId = static_cast<qint64>(song.value(u"id"_s).toDouble());
-                bestDifference = difference;
-            }
-        }
+        const qint64 bestId =
+            bestNetEaseMatch(doc.object().value(u"result"_s).toObject().value(u"songs"_s).toArray());
 
         if (bestId < 0) {
             qCDebug(lcLyrics) << "netease: no artist match for" << m_artist << "-" << m_title;
@@ -977,6 +987,7 @@ void Lyrics::fetchNetEaseLyricsById(const QString& id, int reqId) {
         const auto lines = parseLrc(lrc);
         if (lines.isEmpty()) {
             if (m_plainText.isEmpty()) {
+                m_netEaseId = id;
                 setPlainLyrics(lrc, LyricsBackend::NetEase);
                 setLoading(false);
             } else {
@@ -985,9 +996,196 @@ void Lyrics::fetchNetEaseLyricsById(const QString& id, int reqId) {
             return;
         }
         writeCachedLrc(LyricsBackend::NetEase, id, lrc);
+        m_netEaseId = id;
         setLines(lines, LyricsBackend::NetEase);
         setLoading(false);
     });
+}
+
+qint64 Lyrics::bestNetEaseMatch(const QJsonArray& songs, bool matchTitle) const {
+    // Match title as well as all artists; don't select a different song by
+    // the same artist just because it appears first in search results.
+    // Without title matching, trust the search ranking and take the first hit.
+    qint64 bestId = -1;
+    qreal bestDifference = std::numeric_limits<qreal>::max();
+    for (const auto& value : songs) {
+        const QJsonObject song = value.toObject();
+        const qreal duration = song.value(u"duration"_s).toDouble() / 1000.0;
+        if ((matchTitle && metadataKey(song.value(u"name"_s).toString()) != metadataKey(m_title)) ||
+            !durationMatches(m_duration, duration)) {
+            continue;
+        }
+        const QJsonArray artists = song.value(u"artists"_s).toArray();
+        const bool matches = std::ranges::any_of(artists, [this](const QJsonValue& artist) {
+            return artistMatches(m_artist, artist.toObject().value(u"name"_s).toString());
+        });
+        const qreal difference = m_duration > 0 ? qAbs(m_duration - duration) : 0.0;
+        if (matches && difference < bestDifference) {
+            bestId = static_cast<qint64>(song.value(u"id"_s).toDouble());
+            bestDifference = difference;
+            if (!matchTitle) {
+                break;
+            }
+        }
+    }
+    return bestId;
+}
+
+void Lyrics::loadExtras() {
+    // Only NetEase provides romanization/translation, so look the song up there
+    // even when the lyrics themselves came from another source.
+    if (m_lines.isEmpty() || !containsKana(m_lyrics)) {
+        return;
+    }
+
+    const int reqId = m_currentRequestId;
+    if (!m_netEaseId.isEmpty()) {
+        fetchExtras(m_netEaseId, reqId);
+        return;
+    }
+
+    QUrl url(u"https://music.163.com/api/search/get"_s);
+    QUrlQuery q;
+    q.addQueryItem(u"s"_s, simplifiedMetadata(u"%1 %2"_s.arg(m_title, m_artist)));
+    q.addQueryItem(u"type"_s, u"1"_s);
+    q.addQueryItem(u"limit"_s, u"20"_s);
+    url.setQuery(q);
+
+    auto* reply = getJson(url, netEaseHeaders());
+    trackReply(reqId, reply);
+
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, reqId] {
+        reply->deleteLater();
+        if (reqId != m_currentRequestId) {
+            return;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
+            qCDebug(lcLyrics) << "netease extras /search error:" << reply->errorString();
+            return;
+        }
+        const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        const QJsonArray songs = doc.object().value(u"result"_s).toObject().value(u"songs"_s).toArray();
+        // Player titles are often romanized (e.g. "Kataomoi" for カタオモイ), so fall back to
+        // artist + duration; applyExtras rejects the result if the lyrics don't line up.
+        qint64 id = bestNetEaseMatch(songs);
+        if (id < 0) {
+            id = bestNetEaseMatch(songs, false);
+        }
+        if (id >= 0) {
+            fetchExtras(QString::number(id), reqId);
+        }
+    });
+}
+
+void Lyrics::fetchExtras(const QString& netEaseId, int reqId) {
+    const QString cacheId = netEaseId + u".extras"_s;
+    const QString cached = readCachedLrc(LyricsBackend::NetEase, cacheId);
+    if (!cached.isEmpty()) {
+        applyExtras(QJsonDocument::fromJson(cached.toUtf8()).object());
+        return;
+    }
+
+    QUrl url(u"https://music.163.com/api/song/lyric"_s);
+    QUrlQuery q;
+    q.addQueryItem(u"id"_s, netEaseId);
+    q.addQueryItem(u"lv"_s, u"-1"_s);
+    q.addQueryItem(u"tv"_s, u"-1"_s);
+    q.addQueryItem(u"rv"_s, u"-1"_s);
+    url.setQuery(q);
+
+    auto* reply = getJson(url, netEaseHeaders());
+    trackReply(reqId, reply);
+
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, reqId, cacheId] {
+        reply->deleteLater();
+        if (reqId != m_currentRequestId) {
+            return;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
+            qCDebug(lcLyrics) << "netease extras /lyric error:" << reply->errorString();
+            return;
+        }
+        const QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+        const auto lyricOf = [&obj](const QString& key) {
+            return obj.value(key).toObject().value(u"lyric"_s).toString();
+        };
+        const QJsonObject data{
+            { u"lrc"_s, lyricOf(u"lrc"_s) },
+            { u"tlyric"_s, lyricOf(u"tlyric"_s) },
+            { u"romalrc"_s, lyricOf(u"romalrc"_s) },
+        };
+        writeCachedLrc(LyricsBackend::NetEase, cacheId, QString::fromUtf8(QJsonDocument(data).toJson()));
+        applyExtras(data);
+    });
+}
+
+void Lyrics::applyExtras(const QJsonObject& data) {
+    // NetEase translation/romanization lines share timestamps with its own original
+    // lyrics; map those to text so they also align with lyrics from other sources.
+    const auto byTime = [](const QString& lrc) {
+        QHash<qint64, QString> out;
+        for (const auto& l : parseLrc(lrc)) {
+            out.insert(qRound64(l.time * 1000), l.text);
+        }
+        return out;
+    };
+    const auto roma = byTime(data.value(u"romalrc"_s).toString());
+    const auto trans = byTime(data.value(u"tlyric"_s).toString());
+    if (roma.isEmpty() && trans.isEmpty()) {
+        return;
+    }
+
+    QHash<QString, std::pair<QString, QString>> byText;
+    for (const auto& l : parseLrc(data.value(u"lrc"_s).toString())) {
+        const QString key = metadataKey(l.text);
+        const qint64 ms = qRound64(l.time * 1000);
+        if (!key.isEmpty() && !byText.contains(key)) {
+            byText.insert(key, { roma.value(ms), trans.value(ms) });
+        }
+    }
+
+    QStringList romanizations;
+    QStringList translations;
+    romanizations.reserve(m_lines.size());
+    translations.reserve(m_lines.size());
+    int keyed = 0;
+    int matched = 0;
+    for (const auto& l : std::as_const(m_lines)) {
+        const QString key = metadataKey(l.text);
+        const auto it = byText.constFind(key);
+        if (!key.isEmpty()) {
+            keyed++;
+            matched += it != byText.constEnd();
+        }
+        romanizations.append(it != byText.constEnd() ? it->first : QString());
+        translations.append(it != byText.constEnd() ? convertChinese(it->second, true) : QString());
+    }
+    // Most lines should match, otherwise this is a different song (or version)
+    if (matched * 2 < keyed) {
+        qCDebug(lcLyrics) << "netease extras: only" << matched << "of" << keyed << "lines matched";
+        return;
+    }
+
+    m_hasRomanization = std::ranges::any_of(romanizations, [](const QString& r) {
+        return !r.isEmpty();
+    });
+    m_hasTranslation = std::ranges::any_of(translations, [](const QString& t) {
+        return !t.isEmpty();
+    });
+    m_romanizations = std::move(romanizations);
+    m_translations = std::move(translations);
+    emit extrasChanged();
+}
+
+void Lyrics::clearExtras() {
+    if (m_romanizations.isEmpty() && m_translations.isEmpty()) {
+        return;
+    }
+    m_romanizations.clear();
+    m_translations.clear();
+    m_hasRomanization = false;
+    m_hasTranslation = false;
+    emit extrasChanged();
 }
 
 QNetworkReply* Lyrics::getJson(const QUrl& url, const QHash<QByteArray, QByteArray>& headers) {
