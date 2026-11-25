@@ -37,6 +37,8 @@ Scope {
             property string screen: ""
             property real x: -1
             property real y: -1
+            property real width: 400
+            property real height: 300
             property bool showRomanization: false
             property bool showTranslation: false
         }
@@ -81,6 +83,14 @@ Scope {
                 box.y = Qt.binding(() => box.restY);
             }
 
+            function commitSize(): void {
+                adapter.width = box.implicitWidth;
+                adapter.height = box.implicitHeight;
+
+                box.implicitWidth = Qt.binding(() => adapter.width);
+                box.implicitHeight = Qt.binding(() => adapter.height);
+            }
+
             Timer {
                 running: Players.active?.isPlaying ?? false
                 interval: GlobalConfig.dashboard.mediaUpdateInterval
@@ -97,8 +107,8 @@ Scope {
 
                 x: restX
                 y: restY
-                implicitWidth: 400
-                implicitHeight: 300
+                implicitWidth: adapter.width
+                implicitHeight: adapter.height
 
                 Elevation {
                     anchors.fill: parent
@@ -200,6 +210,29 @@ Scope {
                             showTranslation: adapter.showTranslation
                         }
                     }
+                }
+
+                MouseArea {
+                    property point start
+                    property size startSize
+
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    implicitWidth: Tokens.padding.large * 2
+                    implicitHeight: Tokens.padding.large * 2
+                    cursorShape: Qt.SizeFDiagCursor
+                    preventStealing: true
+
+                    onPressed: event => {
+                        start = mapToItem(win.contentItem, event.x, event.y);
+                        startSize = Qt.size(box.implicitWidth, box.implicitHeight);
+                    }
+                    onPositionChanged: event => {
+                        const p = mapToItem(win.contentItem, event.x, event.y);
+                        box.implicitWidth = Math.max(260, Math.min(startSize.width + p.x - start.x, win.width - box.x));
+                        box.implicitHeight = Math.max(160, Math.min(startSize.height + p.y - start.y, win.height - box.y));
+                    }
+                    onReleased: win.commitSize()
                 }
             }
         }
