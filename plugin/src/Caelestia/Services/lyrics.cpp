@@ -5,6 +5,7 @@
 #include <qjsonarray.h>
 #include <qnetworkcookiejar.h>
 #include <qsavefile.h>
+#include <qset.h>
 #include <qurlquery.h>
 
 #include <opencc/opencc.h>
@@ -128,6 +129,17 @@ constexpr qreal k_indexFudge = 0.1;
             return c.unicode() >= 0x3040 && c.unicode() <= 0x30FF;
         });
     });
+}
+
+[[nodiscard]] QSet<QString> bigrams(const QString& key) {
+    if (key.size() < 2) {
+        return { key };
+    }
+    QSet<QString> out;
+    for (qsizetype i = 0; i + 1 < key.size(); ++i) {
+        out.insert(key.mid(i, 2));
+    }
+    return out;
 }
 
 [[nodiscard]] bool durationMatches(qreal expected, qreal actual) {
@@ -1135,14 +1147,37 @@ void Lyrics::applyExtras(const QJsonObject& data) {
         return;
     }
 
-    QHash<QString, std::pair<QString, QString>> byText;
+    struct Ref {
+        qreal time;
+        QString key;
+        QSet<QString> bigrams;
+        QString roma;
+        QString trans;
+    };
+    QList<Ref> refs;
+    QHash<QString, qsizetype> exact;
     for (const auto& l : parseLrc(data.value(u"lrc"_s).toString())) {
         const QString key = metadataKey(l.text);
+        if (key.isEmpty()) {
+            continue;
+        }
         const qint64 ms = qRound64(l.time * 1000);
-        if (!key.isEmpty() && !byText.contains(key)) {
-            byText.insert(key, { roma.value(ms), trans.value(ms) });
+        exact.insert(key, refs.size()); // Last one wins; fuzzy matching prefers nearby lines anyway
+        refs.append({ l.time, key, bigrams(key), roma.value(ms), convertChinese(trans.value(ms), true) });
+    }
+
+    // Sources often differ in kana/kanji spelling and line breaks, so lines without an
+    // exact match are matched by bigram overlap against NetEase lines near the same time.
+    // Estimate the timing offset between sources from exact matches first.
+    QList<qreal> offsets;
+    for (const auto& l : std::as_const(m_lines)) {
+        const auto it = exact.constFind(metadataKey(l.text));
+        if (l.time >= 0 && it != exact.constEnd()) {
+            offsets.append(refs.at(*it).time - l.time);
         }
     }
+    std::ranges::sort(offsets);
+    const qreal offset = offsets.isEmpty() ? 0.0 : offsets.at(offsets.size() / 2);
 
     QStringList romanizations;
     QStringList translations;
@@ -1152,19 +1187,63 @@ void Lyrics::applyExtras(const QJsonObject& data) {
     int matched = 0;
     for (const auto& l : std::as_const(m_lines)) {
         const QString key = metadataKey(l.text);
-        const auto it = byText.constFind(key);
-        if (!key.isEmpty()) {
-            keyed++;
-            matched += it != byText.constEnd();
+        QList<const Ref*> found;
+        if (const auto it = exact.constFind(key); it != exact.constEnd()) {
+            found.append(&refs.at(*it));
+        } else if (!key.isEmpty()) {
+            const auto b = bigrams(key);
+            const Ref* best = nullptr;
+            qreal bestScore = 0.5;
+            qreal bestDistance = 0.0;
+            QList<const Ref*> contained;
+            for (const auto& r : std::as_const(refs)) {
+                const qreal distance = l.time < 0 ? 0.0 : qAbs(r.time - l.time - offset);
+                if (distance > 8.0) {
+                    continue;
+                }
+                const auto common = static_cast<qreal>(QSet<QString>(b).intersect(r.bigrams).size());
+                const qreal score = common / static_cast<qreal>(std::min(b.size(), r.bigrams.size()));
+                if (score > bestScore || (best && qFuzzyCompare(score, bestScore) && distance < bestDistance)) {
+                    best = &r;
+                    bestScore = score;
+                    bestDistance = distance;
+                }
+                // NetEase may split this line into several; take every part it mostly contains
+                if (common / static_cast<qreal>(r.bigrams.size()) >= 0.7) {
+                    contained.append(&r);
+                }
+            }
+            if (best) {
+                found = contained.contains(best) ? contained : QList<const Ref*>{ best };
+            }
         }
-        romanizations.append(it != byText.constEnd() ? it->first : QString());
-        translations.append(it != byText.constEnd() ? convertChinese(it->second, true) : QString());
+
+        // Only count CJK lines: some sources interleave their own translations
+        if (std::ranges::any_of(key, [](QChar c) {
+                return c.unicode() >= 0x3000;
+            })) {
+            keyed++;
+            matched += !found.isEmpty();
+        }
+        QStringList r;
+        QStringList t;
+        for (const auto* ref : std::as_const(found)) {
+            if (!ref->roma.isEmpty() && !r.contains(ref->roma)) {
+                r.append(ref->roma);
+            }
+            if (!ref->trans.isEmpty() && !t.contains(ref->trans)) {
+                t.append(ref->trans);
+            }
+        }
+        romanizations.append(r.join(u' '));
+        translations.append(t.join(u' '));
     }
     // Most lines should match, otherwise this is a different song (or version)
     if (matched * 2 < keyed) {
         qCDebug(lcLyrics) << "netease extras: only" << matched << "of" << keyed << "lines matched";
         return;
     }
+    qCDebug(lcLyrics) << "netease extras:" << matched << "of" << keyed << "lines matched";
 
     m_hasRomanization = std::ranges::any_of(romanizations, [](const QString& r) {
         return !r.isEmpty();
