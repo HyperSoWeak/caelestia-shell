@@ -15,7 +15,7 @@ import qs.modules.nexus.common
 PageBase {
     id: root
 
-    readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter // qmllint disable unresolved-type
+    readonly property BluetoothAdapter adapter: Bluetooth.defaultAdapter
     readonly property bool btEnabled: adapter?.enabled ?? false
 
     title: Tr.tr("Connected devices")
@@ -46,15 +46,15 @@ PageBase {
             placeholderText: root.btEnabled ? Tr.tr("No saved devices") : Tr.tr("Bluetooth disabled")
 
             model: ScriptModel {
-                values: Bluetooth.devices.values.filter(d => d.bonded).sort((a, b) => (b.connected - a.connected) || a.name.localeCompare(b.name)) // qmllint disable unresolved-type
+                values: Bluetooth.devices.values.filter(d => d.paired || (d.connected && !d.pairing)).sort((a, b) => (b.connected - a.connected) || a.name.localeCompare(b.name) || a.address.localeCompare(b.address))
             }
 
             delegate: StyledRect {
                 id: device
 
                 required property BluetoothDevice modelData
-                readonly property bool connected: modelData && modelData.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
-                readonly property bool loading: modelData && (modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting) // qmllint disable unresolved-type
+                readonly property bool connected: modelData && modelData.state === BluetoothDeviceState.Connected
+                readonly property bool loading: modelData && (modelData.state === BluetoothDeviceState.Connecting || modelData.state === BluetoothDeviceState.Disconnecting)
                 property real textOpacity: loading ? 0.5 : 1
 
                 anchors.left: savedList.list.contentItem.left
@@ -124,11 +124,18 @@ PageBase {
                         StyledText {
                             Layout.fillWidth: true
                             text: {
+                                const m = device.modelData;
+                                if (!m)
+                                    return "";
+                                if (m.state === BluetoothDeviceState.Connecting)
+                                    return Tr.trCtx("Connecting...", "bluetooth device state");
+                                if (m.state === BluetoothDeviceState.Disconnecting)
+                                    return Tr.trCtx("Disconnecting...", "bluetooth device state");
                                 if (!device.connected)
                                     return Tr.trCtx("Saved", "bluetooth device state");
-                                if (device.modelData?.batteryAvailable)
+                                if (m.batteryAvailable)
                                     // TRANSLATORS: %1 = battery level, already formatted as a percentage
-                                    return Tr.trCtx("Connected • %1", "bluetooth device state with battery").arg(Strings.percentOne(device.modelData.battery));
+                                    return Tr.trCtx("Connected • %1", "bluetooth device state with battery").arg(Strings.percentOne(m.battery));
                                 return Tr.trCtx("Connected", "bluetooth device state");
                             }
                             color: Colours.palette.m3outline

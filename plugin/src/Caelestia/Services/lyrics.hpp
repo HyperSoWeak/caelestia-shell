@@ -9,7 +9,7 @@
 
 #include "lyriccandidate.hpp"
 
-namespace caelestia::services {
+namespace caelestia::shell::services {
 
 struct LyricLine {
     qreal time = 0.0;
@@ -22,13 +22,13 @@ class Lyrics : public QObject {
     QML_SINGLETON
 
     Q_PROPERTY(QStringList lyrics READ lyrics NOTIFY lyricsChanged)
-    Q_PROPERTY(caelestia::config::LyricsBackend::Enum backend READ backend NOTIFY backendChanged)
-    Q_PROPERTY(caelestia::config::LyricsBackend::Enum preferredBackend READ preferredBackend WRITE setPreferredBackend
-            NOTIFY preferredBackendChanged)
-    Q_PROPERTY(
-        QList<caelestia::services::LyricCandidate> lyricCandidates READ lyricCandidates NOTIFY lyricCandidatesChanged)
-    Q_PROPERTY(caelestia::services::LyricCandidate selectedCandidate READ selectedCandidate WRITE setSelectedCandidate
-            NOTIFY selectedCandidateChanged)
+    Q_PROPERTY(caelestia::shell::config::LyricsBackend::Enum backend READ backend NOTIFY backendChanged)
+    Q_PROPERTY(caelestia::shell::config::LyricsBackend::Enum preferredBackend READ preferredBackend WRITE
+            setPreferredBackend NOTIFY preferredBackendChanged)
+    Q_PROPERTY(QList<caelestia::shell::services::LyricCandidate> lyricCandidates READ lyricCandidates NOTIFY
+            lyricCandidatesChanged)
+    Q_PROPERTY(caelestia::shell::services::LyricCandidate selectedCandidate READ selectedCandidate WRITE
+            setSelectedCandidate NOTIFY selectedCandidateChanged)
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(bool hasLyrics READ hasLyrics NOTIFY hasLyricsChanged)
     Q_PROPERTY(bool synced READ synced NOTIFY lyricsChanged)
@@ -177,4 +177,4 @@ private:
     bool m_settingFromPrefs = false;
 };
 
-} // namespace caelestia::services
+} // namespace caelestia::shell::services

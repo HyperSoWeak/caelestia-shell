@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Widgets
 import Caelestia.Config
 import Caelestia.I18n
 import qs.components
@@ -74,7 +73,7 @@ Item {
         }
     }
 
-    ClippingRectangle {
+    ClipRect {
         id: clipRect
 
         anchors.left: parent.left
