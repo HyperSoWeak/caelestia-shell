@@ -85,15 +85,32 @@ QtObject {
             mask: Region {}
 
             Image {
+                id: dummyImage
+
+                // The window can move to a screen with a different DPR right after the first Ready, which reloads
+                // the image. A grab rendered during that reload is fully transparent, so grabs are serialised and
+                // any grab that overlapped a reload is discarded and retaken.
+                property int loadGeneration
+                property bool saving
+
                 function tryCache(): void {
-                    if (status !== Image.Ready || width != TokenConfig.sizes.notifs.image || height != TokenConfig.sizes.notifs.image)
+                    if (saving || status !== Image.Ready || width != TokenConfig.sizes.notifs.image || height != TokenConfig.sizes.notifs.image)
                         return;
 
+                    const generation = loadGeneration;
                     const hash = notif.cacheHash(notif.appName + notif.summary + notif.notificationId + notif.image);
                     const cache = `${Paths.notifimagecache}/${hash}.png`;
+                    saving = true;
                     CUtils.saveItem(this, Qt.resolvedUrl(cache), () => {
+                        dummyImage.saving = false;
+                        if (generation !== dummyImage.loadGeneration) {
+                            dummyImage.tryCache();
+                            return;
+                        }
                         notif.image = cache;
                         notif.dummyImageLoader.active = false;
+                    }, () => {
+                        dummyImage.saving = false;
                     });
                 }
 
@@ -104,7 +121,10 @@ QtObject {
                 asynchronous: true
                 opacity: 0
 
-                onStatusChanged: tryCache()
+                onStatusChanged: {
+                    loadGeneration++;
+                    tryCache();
+                }
                 onWidthChanged: tryCache()
                 onHeightChanged: tryCache()
             }
