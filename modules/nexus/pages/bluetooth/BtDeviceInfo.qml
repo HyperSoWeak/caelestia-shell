@@ -16,8 +16,8 @@ PageBase {
     id: root
 
     readonly property BluetoothDevice device: nState.selectedBtDevice
-    readonly property bool connected: device?.state === BluetoothDeviceState.Connected // qmllint disable unresolved-type
-    readonly property bool loading: device?.state === BluetoothDeviceState.Connecting || device?.state === BluetoothDeviceState.Disconnecting // qmllint disable unresolved-type
+    readonly property bool connected: device?.state === BluetoothDeviceState.Connected
+    readonly property bool loading: device?.state === BluetoothDeviceState.Connecting || device?.state === BluetoothDeviceState.Disconnecting
 
     readonly property string statusText: {
         if (!device)
@@ -27,7 +27,7 @@ PageBase {
             return Tr.trCtx("Connected • %1", "bluetooth device state with battery").arg(Strings.percentOne(device.battery));
         if (connected)
             return Tr.trCtx("Connected", "bluetooth device state");
-        return device.bonded ? Tr.trCtx("Paired", "bluetooth device state") : Tr.trCtx("Not paired", "bluetooth device state");
+        return device.paired ? Tr.trCtx("Paired", "bluetooth device state") : Tr.trCtx("Not paired", "bluetooth device state");
     }
 
     onDeviceChanged: {
